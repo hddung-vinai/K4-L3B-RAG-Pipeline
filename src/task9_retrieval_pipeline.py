@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 from .task5_semantic_search import semantic_search
 from .task6_lexical_search import lexical_search
-from .task7_reranking import rerank_rrf
+from .task7_reranking import rerank_bge, rerank_rrf
 from .task8_pageindex_vectorless import pageindex_search
 
 
@@ -33,8 +33,8 @@ load_dotenv()
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD") or 0.55)
 DEFAULT_TOP_K = 5
 
-# Lấy rộng hơn top_k ở mỗi nhánh để RRF có đủ ứng viên chồng lấn giữa hai danh sách.
-CANDIDATE_MULTIPLIER = 2
+# Sơ đồ yêu cầu RRF tạo đúng pool Top 20 trước khi cross-encoder rerank.
+RRF_CANDIDATES = 20
 
 
 def retrieve(
@@ -47,9 +47,8 @@ def retrieve(
     if not query.strip() or top_k <= 0:
         return []
 
-    candidates = top_k * CANDIDATE_MULTIPLIER
-    dense = semantic_search(query, top_k=candidates)
-    sparse = lexical_search(query, top_k=candidates)
+    dense = semantic_search(query, top_k=RRF_CANDIDATES)
+    sparse = lexical_search(query, top_k=RRF_CANDIDATES)
 
     # Đọc cosine score gốc TRƯỚC khi fuse. rerank_rrf() đã copy item nên không
     # sửa danh sách đầu vào, nhưng đọc trước là lớp phòng vệ thứ hai.
@@ -57,11 +56,18 @@ def retrieve(
 
     # Fuse đúng một lần, kể cả khi dense tự tin — nhánh quyết định fallback nằm
     # ở dưới và dùng score khác, không phải kết quả của RRF.
-    hybrid = (
-        rerank_rrf([dense, sparse], top_k=top_k)
-        if use_reranking
-        else dense[:top_k]
-    )
+    if use_reranking:
+        fused = rerank_rrf([dense, sparse], top_k=RRF_CANDIDATES)
+        try:
+            # BGE reranker receives the query and the complete RRF Top 20 pool.
+            hybrid = rerank_bge(query, fused, top_k=top_k)
+        except Exception as error:
+            # Retrieval must remain usable when the optional cross-encoder model
+            # is unavailable locally or cannot be downloaded.
+            print(f"BGE reranker lỗi ({type(error).__name__}: {error}) — dùng RRF")
+            hybrid = fused[:top_k]
+    else:
+        hybrid = dense[:top_k]
 
     if best_dense_score < score_threshold:
         try:
