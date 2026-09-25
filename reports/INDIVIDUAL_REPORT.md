@@ -8,7 +8,7 @@
 
 - Họ và tên: Nguyễn Phúc Huy
 - Mã học viên: 2A202602911
-- Nhóm: K4 — L3B
+- Nhóm: snoopi
 - Repository/branch: fork `Yuhnguyn/K4-L3B-RAG-Pipeline`, nhánh
   `feat/abbrev-memory-commandcode` (commit `7c3f61e`, `9eb6be9`), PR #1 về `hddung-vinai/K4-L3B-RAG-Pipeline`
 
