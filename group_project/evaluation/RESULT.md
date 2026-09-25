@@ -17,14 +17,6 @@
 Kết quả thô từng case: `group_project/evaluation/raw_results.json`.
 Script tái lập: `python -m src.run_evaluation`.
 
-> **Lưu ý về mô hình dùng khi demo.** Toàn bộ số liệu trong báo cáo này được đo với
-> generator và evaluator là `gpt-4o-mini`. Tại thời điểm demo, tài khoản OpenAI của nhóm
-> hết credit nên bản chạy trực tiếp có thể được chuyển tạm sang `LLM_PROVIDER=gemini`
-> bằng cách đổi `.env`, không sửa code. Khác biệt này **chỉ nằm ở tầng generation**:
-> embedding vẫn là `bge-m3` chạy cục bộ, ChromaDB, cấu hình chunk, BM25, RRF và ngưỡng
-> fallback đều không đổi, nên mọi kết luận về retrieval trong báo cáo vẫn giữ nguyên
-> hiệu lực. Các số về `faithfulness` và `answer relevance` thì gắn với `gpt-4o-mini`
-> và cần đo lại nếu nhóm quyết định đổi hẳn sang mô hình khác.
 
 ## Indexing configuration and rationale
 
