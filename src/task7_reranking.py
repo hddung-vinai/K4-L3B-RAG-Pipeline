@@ -1,5 +1,4 @@
-"""
-Task 7 — Reciprocal Rank Fusion.
+"""Task 7 — Reciprocal Rank Fusion and BGE cross-encoder reranking.
 
 RRF gộp nhiều bảng xếp hạng mà không cộng trực tiếp cosine score với BM25
 score. Công thức: RRF(d) = sum(1 / (k + rank)), rank bắt đầu từ 1.
@@ -11,6 +10,13 @@ danh sách dense để quyết định fallback. Nếu RRF ghi đè score trực
 của danh sách đầu vào thì cosine score (~0.6) bị thay bằng RRF score (~0.03),
 và mọi truy vấn sẽ rơi xuống dưới threshold.
 """
+
+import os
+
+
+RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
+
+_reranker = None
 
 
 def rerank_rrf(
@@ -42,6 +48,34 @@ def rerank_rrf(
         result["retrieval_method"] = "hybrid"
         results.append(result)
     return results
+
+
+def rerank_bge(query: str, candidates: list[dict], top_k: int = 5) -> list[dict]:
+    """Rerank RRF candidates with BGE cross-encoder scores.
+
+    The model is loaded lazily so indexing and tests do not pay its startup cost.
+    Callers can disable this stage with ``RERANKER_ENABLED=0``; failures are
+    intentionally raised so the retrieval pipeline can fall back to RRF.
+    """
+    global _reranker
+    if not candidates or top_k <= 0:
+        return []
+
+    if _reranker is None:
+        from sentence_transformers import CrossEncoder
+
+        _reranker = CrossEncoder(RERANKER_MODEL)
+
+    pairs = [(query, item["content"]) for item in candidates]
+    scores = _reranker.predict(pairs)
+
+    results = []
+    for item, score in zip(candidates, scores):
+        result = item.copy()
+        result["score"] = float(score)
+        result["retrieval_method"] = "hybrid"
+        results.append(result)
+    return sorted(results, key=lambda item: item["score"], reverse=True)[:top_k]
 
 
 if __name__ == "__main__":
